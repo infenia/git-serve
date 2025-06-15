@@ -30,3 +30,76 @@
 *.exe
 *.out
 *.app
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+*.ids
+*.orig
+.idea_modules/
+.idea/*.xml
+.idea/*.iml
+.idea/modules.xml
+.idea/workspace.xml
+.idea/libraries/
+.idea/scopes/
+.idea/inspectionProfiles/
+.idea/misc.xml
+.idea/vcs.xml
+.idea/compiler.xml
+.idea/encodings.xml
+.idea/modules/
+.idea/sonarlint/
+.idea/runConfigurations/
+*.iws
+out/
+.idea_modules/
+atlassian-ide-plugin.xml
+
+# JetBrains editors
+.idea/
+!.idea/codeStyles/
+!.idea/codeStyles/codeStyleConfig.xml
+!.idea/inspectionProfiles/
+!.idea/scopes/
+
+# JIRA plugin
+atlassian-ide-plugin.xml
+
+# Crashlytics plugin (for Android Studio and IntelliJ)
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+# Editor-based Rest Client
+.idea/httpRequests/
+
+# Android studio 3.1+ serialized cache file
+.idea/caches/build_file_checksums.ser
+
+# IntelliJ
+out/
+
+# mpeltonen/sbt-idea plugin
+.idea_modules/
+
+# JIRA plugin
+atlassian-ide-plugin.xml
+
+# Cursive Clojure plugin
+.idea/replstate.xml
+
+# Crashlytics plugin (for Android Studio and IntelliJ)
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+# Editor-based Rest Client
+.idea/httpRequests/
+
+# Android studio 3.1+ serialized cache file
+.idea/caches/build_file_checksums.ser
