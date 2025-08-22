@@ -171,7 +171,7 @@ int Connection::listen() {
 
   int n = 0;
   while (n >= 0 && !interrupted) {
-    n = lws_service(context, 0);
+    n = lws_service(context, 100);
   }
   lws_context_destroy(context);
   logger::get()->info("Server stopped", nlohmann::json{{"trace_id", trace_id}}.dump());
