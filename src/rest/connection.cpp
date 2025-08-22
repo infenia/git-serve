@@ -15,14 +15,15 @@
  */
 
 // Module: rest/connection.cpp
-// Handles HTTP protocol events and server connection logic for REST API endpoints.
-// Key functions: http_protocol_ev_handle, Connection, listen
+// Handles HTTP protocol events and server connection logic for REST API
+// endpoints. Key functions: http_protocol_ev_handle, Connection, listen
 // Logging: Structured logging for HTTP requests/responses (except /health)
 
 #include "connection.hpp"
 
 #include <libwebsockets.h>
 #include <signal.h>
+
 #include <nlohmann/json.hpp>
 
 #include "rest/connection_cxt.hpp"
@@ -38,7 +39,8 @@ static int interrupted;
 void sigint_handler(int sig) { interrupted = 1; }
 
 // Handles HTTP protocol events for libwebsockets REST server.
-// Robust error handling: All external and critical operations are checked for errors, with logs on failure.
+// Robust error handling: All external and critical operations are checked for
+// errors, with logs on failure.
 int http_protocol_ev_handle(lws *wsi, lws_callback_reasons reason, void *data,
                             void *in, size_t len) {
   auto get_http_transaction = [&data]() -> HttpTransaction * {
@@ -79,12 +81,10 @@ int http_protocol_ev_handle(lws *wsi, lws_callback_reasons reason, void *data,
       std::string trace_id = traceid::generate();
       get_http_transaction()->set_trace_id(trace_id);
       if (std::string(uri) != "/health") {
-        nlohmann::json req_log = {
-          {"msg", "HTTP request"},
-          {"method", (int)method},
-          {"endpoint", std::string(uri)},
-          {"trace_id", trace_id}
-        };
+        nlohmann::json req_log = {{"msg", "HTTP request"},
+                                  {"method", (int)method},
+                                  {"endpoint", std::string(uri)},
+                                  {"trace_id", trace_id}};
         logger::get()->info(req_log.dump());
       }
       if (!get_http_transaction()->has_request_body()) {
@@ -99,7 +99,7 @@ int http_protocol_ev_handle(lws *wsi, lws_callback_reasons reason, void *data,
       break;
     case LWS_CALLBACK_HTTP_WRITEABLE: {
       // Remove response logging from here (will move to write_header)
-      HttpTransaction* txn = get_http_transaction();
+      HttpTransaction *txn = get_http_transaction();
       return txn->write();
       break;
     }
@@ -135,7 +135,8 @@ void log_emit_function(int level, const char *line) {
 // Connection function definition
 
 // Establishes and manages a REST server connection.
-// Robust error handling: All external and critical operations are checked for errors, with logs on failure.
+// Robust error handling: All external and critical operations are checked for
+// errors, with logs on failure.
 Connection::Connection(ServerContext *cxt) {
   memset(&info, 0, sizeof(lws_context_creation_info));
   memset(protocols, 0, sizeof(lws_protocols) * 2);
@@ -159,10 +160,12 @@ Connection::Connection(ServerContext *cxt) {
 }
 
 // Starts the REST server and listens for incoming connections.
-// Robust error handling: All external and critical operations are checked for errors, with logs on failure.
+// Robust error handling: All external and critical operations are checked for
+// errors, with logs on failure.
 int Connection::listen() {
   std::string trace_id = traceid::generate();
-  logger::get()->info("Starting server", nlohmann::json{{"trace_id", trace_id}}.dump());
+  logger::get()->info("Starting server",
+                      nlohmann::json{{"trace_id", trace_id}}.dump());
   int log_level = LLL_ERR | LLL_WARN | LLL_NOTICE;
   lws_set_log_level(log_level, log_emit_function);
 
@@ -174,6 +177,7 @@ int Connection::listen() {
     n = lws_service(context, 100);
   }
   lws_context_destroy(context);
-  logger::get()->info("Server stopped", nlohmann::json{{"trace_id", trace_id}}.dump());
+  logger::get()->info("Server stopped",
+                      nlohmann::json{{"trace_id", trace_id}}.dump());
   return 0;
 }
