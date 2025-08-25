@@ -18,7 +18,6 @@
 
 #include <libwebsockets.h>
 
-#include <iostream>
 #include <nlohmann/json.hpp>
 
 #include "utils/logger.hpp"
