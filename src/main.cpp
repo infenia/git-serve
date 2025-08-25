@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <cstdlib>
 
 #include "easymarry/easymarry.hpp"
@@ -24,6 +25,7 @@
 #include "utils/logger.hpp"
 
 int main(int argc, const char **argv) {
+  std::atomic_bool interrupted(false);
   Configuration conf;
   conf.populate_config();
 
@@ -31,18 +33,18 @@ int main(int argc, const char **argv) {
   logger::get()->info("Env loaded");
   MasterDataBuffer data_buffer;
 
-  EasyMarry em(conf, &data_buffer);
+  EasyMarry em(conf, &data_buffer, interrupted);
   em.start_timer_job();
 
   IOHandler io_handler;
   Router router(&em, &io_handler);
   ServerContext cxt;
 
-  cxt.port       = 9000;
+  cxt.port       = 8080;
   cxt.router     = &router;
   cxt.io_handler = &io_handler;
 
-  Connection connection(&cxt);
+  Connection connection(&cxt, interrupted);
   connection.listen();
 
   return 0;

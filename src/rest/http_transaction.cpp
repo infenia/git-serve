@@ -17,10 +17,11 @@
 #include "http_transaction.hpp"
 
 #include <libwebsockets.h>
-#include <nlohmann/json.hpp>
-#include "utils/logger.hpp"
 
 #include <iostream>
+#include <nlohmann/json.hpp>
+
+#include "utils/logger.hpp"
 
 // HttpTransaction function definition
 
@@ -69,15 +70,13 @@ int HttpTransaction::write_header() {
   char uri[100];
   memset(uri, 0, 100);
   HTTP_METHOD method = get_uri_and_method(uri, 100);
-  int status_code = (int)get_status();
+  int status_code    = (int)get_status();
   // Only log if endpoint is not /health
   if (std::string(uri) != "/health") {
-    nlohmann::json resp_log = {
-      {"msg", "HTTP response"},
-      {"status_code", status_code},
-      {"endpoint", std::string(uri)},
-      {"trace_id", get_trace_id()}
-    };
+    nlohmann::json resp_log = {{"msg", "HTTP response"},
+                               {"status_code", status_code},
+                               {"endpoint", std::string(uri)},
+                               {"trace_id", get_trace_id()}};
     logger::get()->info(resp_log.dump());
   }
   state = STATE::HEADER_WRITTEN;
@@ -166,11 +165,12 @@ HTTP_METHOD HttpTransaction::get_uri_and_method(char *url, int len) {
       return HTTP_METHOD::UNKNOWN;
   }
 
-  if (uri_len > len) {
+  if (uri_len >= len) {
     return HTTP_METHOD::UNKNOWN;
   }
 
   memcpy(url, uri_buf, uri_len);
+  url[uri_len] = '\0';
 
   return method;
 }

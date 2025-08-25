@@ -44,7 +44,7 @@ struct Configuration {
   std::string branch;
 
   void populate_config() {
-    token = std::string(std::getenv("GITHUB_TOKEN"));
+    token  = std::string(std::getenv("GITHUB_TOKEN"));
     owner  = std::string(std::getenv("GITHUB_OWNER"));
     repo   = std::string(std::getenv("GITHUB_REPO"));
     branch = std::string(std::getenv("GITHUB_BRANCH"));
@@ -107,11 +107,13 @@ struct MasterDataBuffer {
     char* value = new char[compressed_value.size() + 1];
     memset(value, 0, compressed_value.size() + 1);
     std::copy(compressed_value.begin(), compressed_value.end(), value);
-    free(raw_value);
     if (master_data.contains(item)) {
-      free(master_data[item]);
+      auto temp = master_data[item]->data;
+
       master_data[item]->data = value;
       master_data[item]->len  = compressed_value.length();
+
+      delete temp;
     } else {
       ResponseBuffer* buffer = new ResponseBuffer;
       buffer->data           = value;
@@ -125,5 +127,13 @@ struct MasterDataBuffer {
     memset(data, 0, value.length() + 1);
     strncpy(data, value.c_str(), value.length());
     update(item, data);
+    free(data);
+  }
+
+  ~MasterDataBuffer() {
+    for (auto& [key, buffer] : master_data) {
+      delete[] buffer->data;
+      delete buffer;
+    }
   }
 };

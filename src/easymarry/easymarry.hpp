@@ -19,6 +19,7 @@
 #include <libwebsockets.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <string>
 #include <thread>
 
@@ -38,20 +39,28 @@ void update_postalcodes_cache(const char* buff, MasterDataBuffer* data_buffer);
 class EasyMarry {
   Configuration conf;
   std::thread t1;
+  std::atomic_bool& interrupted;
 
  public:
   MasterDataBuffer* data_buffer = nullptr;
 
-  EasyMarry(Configuration& conf, MasterDataBuffer* data_buffer) {
-    this->conf        = conf;
-    this->data_buffer = data_buffer;
+  EasyMarry(Configuration& _conf, MasterDataBuffer* _data_buffer,
+            std::atomic_bool& _interrupted)
+      : conf(_conf), data_buffer(_data_buffer), interrupted(_interrupted) {}
+
+  ~EasyMarry() {
+    if (t1.joinable()) {
+      t1.join();
+    }
   }
 
   void start_timer_job() {
     t1 = std::thread([this]() {
-      while (true) {
+      while (!interrupted.load()) {
         update_cache();
-        sleep(60 * 60);
+        for (int i = 0; i < 60 * 5 && !interrupted.load(); ++i) {
+          sleep(1);
+        }
       }
     });
   }
@@ -62,69 +71,93 @@ class EasyMarry {
     std::string owner  = conf.owner;
     std::string branch = conf.branch;
 
-    auto health = get_files_from_github(token, owner, repo, branch, "health/status.json");
+    if (auto health = get_files_from_github(token, owner, repo, branch,
+                                            "health/status.json");
+        health) {
+      data_buffer->update("/health", health);
+      delete health;
+    }
 
-    auto age = get_files_from_github(token, owner, repo, branch, "data/age.json");
+    if (auto age = get_files_from_github(token, owner, repo, branch,
+                                         "resource/age.json");
+        age) {
+      data_buffer->update("/age", age);
+      delete age;
+    }
 
-    auto caste =
-        get_files_from_github(token, owner, repo, branch, "data/caste.json");
+    if (auto caste = get_files_from_github(token, owner, repo, branch,
+                                           "resource/caste.json");
+        caste) {
+      data_buffer->update("/caste", caste);
+      delete caste;
+    }
 
-    auto country =
-        get_files_from_github(token, owner, repo, branch, "data/country.json");
+    if (auto country = get_files_from_github(token, owner, repo, branch,
+                                             "resource/country.json");
+        country) {
+      data_buffer->update("/country", country);
+      delete country;
+    }
 
-    auto designation =
-        get_files_from_github(token, owner, repo, branch, "data/designation.json");
+    if (auto designation = get_files_from_github(token, owner, repo, branch,
+                                                 "resource/designation.json");
+        designation) {
+      data_buffer->update("/designation", designation);
+      delete designation;
+    }
 
-    auto im_signing_up_for = get_files_from_github(
-        token, owner, repo, branch, "data/im-signing-up-for.json");
-
-    auto indian_state_district = get_files_from_github(
-        token, owner, repo, branch, "data/indian-state-district.json");
-
-    auto indian_state =
-        get_files_from_github(token, owner, repo, branch, "data/indian-state.json");
-
-    auto location =
-        get_files_from_github(token, owner, repo, branch, "data/location.json");
-
-    auto qualification =
-        get_files_from_github(token, owner, repo, branch, "data/qualification.json");
-
-    auto religion =
-        get_files_from_github(token, owner, repo, branch, "data/religion.json");
-
-    auto sub_caste =
-        get_files_from_github(token, owner, repo, branch, "data/sub-caste.json");
-
-    if (health) data_buffer->update("/health", health);
-
-    if (age) data_buffer->update("/age", age);
-
-    if (caste) data_buffer->update("/caste", caste);
-
-    if (country) data_buffer->update("/country", country);
-
-    if (designation) data_buffer->update("/designation", designation);
-
-    if (im_signing_up_for)
+    if (auto im_signing_up_for = get_files_from_github(
+            token, owner, repo, branch, "resource/im-signing-up-for.json");
+        im_signing_up_for) {
       data_buffer->update("/im-signing-up-for", im_signing_up_for);
+      delete im_signing_up_for;
+    }
 
-    if (indian_state_district)
+    if (auto indian_state_district = get_files_from_github(
+            token, owner, repo, branch, "resource/indian-state-district.json");
+        indian_state_district) {
       data_buffer->update("/indian-state-district", indian_state_district);
+      delete indian_state_district;
+    }
 
-    if (indian_state) data_buffer->update("/indian-state", indian_state);
+    if (auto indian_state = get_files_from_github(token, owner, repo, branch,
+                                                  "resource/indian-state.json");
+        indian_state) {
+      data_buffer->update("/indian-state", indian_state);
+      delete indian_state;
+    }
 
-    if (location) data_buffer->update("/location", location);
+    if (auto location = get_files_from_github(token, owner, repo, branch,
+                                              "resource/location.json");
+        location) {
+      data_buffer->update("/location", location);
+      delete location;
+    }
 
-    if (qualification) data_buffer->update("/qualification", qualification);
+    if (auto qualification = get_files_from_github(
+            token, owner, repo, branch, "resource/qualification.json");
+        qualification) {
+      data_buffer->update("/qualification", qualification);
+      delete qualification;
+    }
 
-    if (religion) data_buffer->update("/religion", religion);
+    if (auto religion = get_files_from_github(token, owner, repo, branch,
+                                              "resource/religion.json");
+        religion) {
+      data_buffer->update("/religion", religion);
+      delete religion;
+    }
 
-    if (sub_caste) data_buffer->update("/sub-caste", sub_caste);
+    if (auto sub_caste = get_files_from_github(token, owner, repo, branch,
+                                               "resource/sub-caste.json");
+        sub_caste) {
+      data_buffer->update("/sub-caste", sub_caste);
+      delete sub_caste;
+    }
 
-    auto buff = get_files_from_github(token, owner, repo, branch, "data/post.csv");
-
-    if (buff) {
+    if (auto buff = get_files_from_github(token, owner, repo, branch,
+                                          "resource/post.csv");
+        buff) {
       update_postalcodes_cache(buff, data_buffer);
       delete buff;
     }

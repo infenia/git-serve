@@ -18,6 +18,8 @@
 
 #include <libwebsockets.h>
 
+#include <atomic>
+
 #include "server_context.hpp"
 
 class Connection {
@@ -25,8 +27,10 @@ class Connection {
   lws_protocols protocols[2];
   ServerContext* server_cxt;
 
+  std::atomic_bool& exit_server;
+
  public:
-  Connection(ServerContext* cxt);
+  Connection(ServerContext* cxt, std::atomic_bool& _exit_server);
 
   int listen();
 };

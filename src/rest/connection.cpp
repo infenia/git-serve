@@ -24,6 +24,8 @@
 #include <libwebsockets.h>
 #include <signal.h>
 
+#include <atomic>
+#include <cstdlib>
 #include <nlohmann/json.hpp>
 
 #include "rest/connection_cxt.hpp"
@@ -36,7 +38,10 @@
 
 static int interrupted;
 
-void sigint_handler(int sig) { interrupted = 1; }
+void sigint_handler(int sig) {
+  interrupted = 1;
+  exit(0);
+}
 
 // Handles HTTP protocol events for libwebsockets REST server.
 // Robust error handling: All external and critical operations are checked for
@@ -137,7 +142,8 @@ void log_emit_function(int level, const char *line) {
 // Establishes and manages a REST server connection.
 // Robust error handling: All external and critical operations are checked for
 // errors, with logs on failure.
-Connection::Connection(ServerContext *cxt) {
+Connection::Connection(ServerContext *cxt, std::atomic_bool &_exit_server)
+    : exit_server(_exit_server) {
   memset(&info, 0, sizeof(lws_context_creation_info));
   memset(protocols, 0, sizeof(lws_protocols) * 2);
 
@@ -174,7 +180,8 @@ int Connection::listen() {
 
   int n = 0;
   while (n >= 0 && !interrupted) {
-    n = lws_service(context, 100);
+    exit_server.store(interrupted);
+    n = lws_service(context, 0);
   }
   lws_context_destroy(context);
   logger::get()->info("Server stopped",
