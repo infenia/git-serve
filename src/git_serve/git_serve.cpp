@@ -34,9 +34,10 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <cstring>
-#include <forward_list>
 #include <fstream>
+#include <iostream>
 #include <list>
 #include <nlohmann/json.hpp>
 #include <sstream>
@@ -65,71 +66,64 @@ off_t get_file_size(int fd) {
   return -1;
 }
 
-std::string postalcode_to_json(PostalCode& postalCode) {
-  auto gen_keyvalue = [&](const std::string& k, const std::string& v) {
-    std::string json = "\"" + k + "\":\"" + v + "\"";
-    return json;
-  };
-  std::string json = "{";
-  json += gen_keyvalue("name", postalCode.name) + ",";
-  json += gen_keyvalue("pincode", postalCode.pinCode) + ",";
-  json += gen_keyvalue("division", postalCode.division) + ",";
-  json += gen_keyvalue("region", postalCode.region) + ",";
-  json += gen_keyvalue("circle", postalCode.circle) + ",";
-  json += gen_keyvalue("taluk", postalCode.taluk) + ",";
-  json += gen_keyvalue("district", postalCode.district) + ",";
-  json += gen_keyvalue("state", postalCode.state) + ",";
-  json += gen_keyvalue("longitude", postalCode.longitude) + ",";
-  json += gen_keyvalue("latitude", postalCode.latitude) + "}";
-  return json;
-}
-
 std::string postalcodes_to_json(std::list<PostalCode>& postalCodes) {
-  std::string json       = "[";
-  std::string item_split = "";
+  nlohmann::json j = nlohmann::json::array();
+
   for (auto& postalCode : postalCodes) {
-    json += item_split;
-    json += postalcode_to_json(postalCode);
-    item_split = ",";
+    j.push_back({{"name", postalCode.name},
+                 {"pincode", postalCode.pinCode},
+                 {"division", postalCode.division},
+                 {"region", postalCode.region},
+                 {"circle", postalCode.circle},
+                 {"taluk", postalCode.taluk},
+                 {"district", postalCode.district},
+                 {"state", postalCode.state},
+                 {"longitude", postalCode.longitude},
+                 {"latitude", postalCode.latitude}});
   }
-  json += "]\0";
-  return json;
+
+  return j.dump();
 }
 
 void update_postalcodes_cache(const char* buff, GitServe* git_serve) {
-  std::string csv(buff);
-  std::stringstream csv_stream(csv);
+  auto start_total = std::chrono::high_resolution_clock::now();
+
+  auto start_parsing = std::chrono::high_resolution_clock::now();
+  std::stringstream csv_stream(buff);
   std::string csv_line;
 
   std::unordered_map<std::string, std::list<PostalCode>> postalCodes_map;
+  // Its an extimate of total postal codes in india: reserve it
+  postalCodes_map.reserve(160000);
+
+  // Skip first line
+  std::getline(csv_stream, csv_line, '\n');
+
   while (std::getline(csv_stream, csv_line, '\n')) {
-    std::stringstream csv_line_stream(csv_line);
-
-    std::string item;
-    PostalCode postalCode;
-
-    auto get_next = [&]() {
-      std::string item;
-      std::getline(csv_line_stream, item, ',');
-      return item;
+    size_t pos = 0, next = 0;
+    auto get_field = [&](std::string& _out) {
+      next = csv_line.find(',', pos);
+      if (next == std::string::npos) next = csv_line.length();
+      _out = csv_line.substr(pos, next - pos);
+      pos  = next + 1;
     };
-    postalCode.name      = get_next();
-    postalCode.pinCode   = get_next();
-    postalCode.division  = get_next();
-    postalCode.region    = get_next();
-    postalCode.circle    = get_next();
-    postalCode.taluk     = get_next();
-    postalCode.district  = get_next();
-    postalCode.state     = get_next();
-    postalCode.longitude = get_next();
-    postalCode.latitude  = get_next();
+    PostalCode postalCode;
+    get_field(postalCode.name);
+    get_field(postalCode.pinCode);
+    get_field(postalCode.division);
+    get_field(postalCode.region);
+    get_field(postalCode.circle);
+    get_field(postalCode.taluk);
+    get_field(postalCode.district);
+    get_field(postalCode.state);
+    get_field(postalCode.longitude);
+    get_field(postalCode.latitude);
 
-    if (postalCodes_map.contains(postalCode.pinCode)) {
-      postalCodes_map[postalCode.pinCode].push_back(postalCode);
-    } else {
-      postalCodes_map[postalCode.pinCode] = std::list<PostalCode>({postalCode});
-    }
+    postalCodes_map[postalCode.pinCode].push_back(postalCode);
   }
+
+  // Create directory if not exist
+  std::filesystem::create_directories("/var/www/html/postalcode");
 
   for (auto& grouped_postalcodes : postalCodes_map) {
     auto json_array = postalcodes_to_json(grouped_postalcodes.second);
@@ -351,28 +345,6 @@ void GitServe::update_cache() {
 
 void GitServe::update_data(const std::string& item, const std::string& value) {
   std::string file_path = "/var/www/html" + item + ".json";
-
-  // Check if file exists and has the same content
-  std::ifstream existing_file(file_path);
-  if (existing_file.is_open()) {
-    std::string existing_content(
-        (std::istreambuf_iterator<char>(existing_file)),
-        std::istreambuf_iterator<char>());
-    existing_file.close();
-
-    // If content is identical, don't write (preserves modification time)
-    if (existing_content == value) {
-      return;
-    }
-  }
-
-  // Create directory structure if needed
-  size_t last_slash = file_path.find_last_of('/');
-  if (last_slash != std::string::npos) {
-    std::string dir_path  = file_path.substr(0, last_slash);
-    std::string mkdir_cmd = "mkdir -p " + dir_path;
-    system(mkdir_cmd.c_str());
-  }
 
   // Write data directly to file only if content changed
   std::ofstream file(file_path, std::ios::out);
