@@ -106,4 +106,5 @@ fabric.properties
 
 .cache/
 
-build_cmake/
+build
+compile_commands.json
