@@ -14,47 +14,22 @@
  * limitations under the License.
  */
 
-#include <atomic>
-#include <chrono>
-#include <csignal>
-#include <thread>
 
 #include "git_serve/git_serve.hpp"
 #include "git_serve/master_data.hpp"
 #include "utils/logger.hpp"
 
-// Global interrupt flag for signal handling
-std::atomic_bool g_interrupted(false);
-
-// Signal handler for SIGINT and SIGTERM
-void signal_handler(int signal) {
-  if (signal == SIGINT || signal == SIGTERM) {
-    logger::get()->info("Received interrupt signal, shutting down gracefully");
-    g_interrupted.store(true);
-  }
-}
 
 int main(int argc, const char **argv) {
   logger::init();
-  logger::get()->info("Application starting");
-
-  // Set up signal handlers for graceful shutdown
-  std::signal(SIGINT, signal_handler);
-  std::signal(SIGTERM, signal_handler);
+  logger::get()->info("Git serve data fetch starting");
 
   Configuration conf;
   conf.populate_config();
 
-  GitServe em(conf, g_interrupted);
-  em.start_timer_job();
+  GitServe git_serve(conf);
+  git_serve.run();
 
-  // Wait for interrupt signal
-  while (!g_interrupted.load()) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-
-  logger::get()->info("Application shutting down");
-  em.shutdown();
-  logger::get()->info("Application shutdown complete");
+  logger::get()->info("Git serve data fetch completed");
   return 0;
 }

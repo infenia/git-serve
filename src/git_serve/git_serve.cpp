@@ -35,8 +35,8 @@
 #include <unistd.h>
 
 #include <cstring>
-#include <fstream>
 #include <forward_list>
+#include <fstream>
 #include <list>
 #include <nlohmann/json.hpp>
 #include <sstream>
@@ -96,13 +96,12 @@ std::string postalcodes_to_json(std::list<PostalCode>& postalCodes) {
   return json;
 }
 
-
 void update_postalcodes_cache(const char* buff, GitServe* git_serve) {
   std::string csv(buff);
   std::stringstream csv_stream(csv);
   std::string csv_line;
 
-  std::forward_list<PostalCode> postalCodes;
+  std::unordered_map<std::string, std::list<PostalCode>> postalCodes_map;
   while (std::getline(csv_stream, csv_line, '\n')) {
     std::stringstream csv_line_stream(csv_line);
 
@@ -124,13 +123,7 @@ void update_postalcodes_cache(const char* buff, GitServe* git_serve) {
     postalCode.state     = get_next();
     postalCode.longitude = get_next();
     postalCode.latitude  = get_next();
-    postalCodes.push_front(postalCode);
-  }
 
-  std::unordered_map<std::string, std::list<PostalCode>> postalCodes_map;
-
-  for (auto& postalCode : postalCodes) {
-    auto json_item = postalcode_to_json(postalCode);
     if (postalCodes_map.contains(postalCode.pinCode)) {
       postalCodes_map[postalCode.pinCode].push_back(postalCode);
     } else {
@@ -140,7 +133,8 @@ void update_postalcodes_cache(const char* buff, GitServe* git_serve) {
 
   for (auto& grouped_postalcodes : postalCodes_map) {
     auto json_array = postalcodes_to_json(grouped_postalcodes.second);
-    git_serve->update_data("/postalcode/" + grouped_postalcodes.first, json_array);
+    git_serve->update_data("/postalcode/" + grouped_postalcodes.first,
+                           json_array);
   }
 }
 
@@ -232,6 +226,16 @@ char* get_files_from_github(const std::string& token, const std::string& owner,
         sleep(retry_delay_sec);
       }
     }
+
+    if (attempt >= max_retries) {
+      std::string error_msg =
+          std::string("Fetching content from github failed with retries");
+      nlohmann::json log_obj = {{"msg", error_msg},
+                                {"trace_id", trace_id},
+                                {"url", url},
+                                {"attempt", attempt + 1}};
+      logger::get()->error(log_obj.dump());
+    }
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
     if (success) {
@@ -241,7 +245,7 @@ char* get_files_from_github(const std::string& token, const std::string& owner,
       return nullptr;
     }
   }
-  
+
   // Clean up if curl_easy_init failed
   free(data.data);
   return nullptr;
@@ -298,8 +302,7 @@ void GitServe::update_cache() {
   if (auto indian_state_district = get_files_from_github(
           token, owner, repo, branch, "resource/indian-state-district.json");
       indian_state_district) {
-    update_data("/indian-state-district",
-                        std::string(indian_state_district));
+    update_data("/indian-state-district", std::string(indian_state_district));
     free(indian_state_district);
   }
 
@@ -352,10 +355,11 @@ void GitServe::update_data(const std::string& item, const std::string& value) {
   // Check if file exists and has the same content
   std::ifstream existing_file(file_path);
   if (existing_file.is_open()) {
-    std::string existing_content((std::istreambuf_iterator<char>(existing_file)),
-                                 std::istreambuf_iterator<char>());
+    std::string existing_content(
+        (std::istreambuf_iterator<char>(existing_file)),
+        std::istreambuf_iterator<char>());
     existing_file.close();
-    
+
     // If content is identical, don't write (preserves modification time)
     if (existing_content == value) {
       return;

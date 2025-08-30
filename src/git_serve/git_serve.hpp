@@ -19,9 +19,7 @@
 #include <libwebsockets.h>
 #include <unistd.h>
 
-#include <atomic>
 #include <string>
-#include <thread>
 
 #include "git_serve/master_data.hpp"
 #include "malloc.h"
@@ -35,36 +33,13 @@ void update_postalcodes_cache(const char* buff, GitServe* git_serve);
 
 class GitServe {
   Configuration conf;
-  std::thread t1;
-  std::atomic_bool& interrupted;
 
  public:
-  GitServe(Configuration& _conf, std::atomic_bool& _interrupted)
-      : conf(_conf), interrupted(_interrupted) {}
+  GitServe(Configuration& _conf) : conf(_conf) {}
 
-  ~GitServe() {
-    if (t1.joinable()) {
-      t1.join();
-    }
-  }
-
-  void start_timer_job() {
-    t1 = std::thread([this]() {
-      while (!interrupted.load()) {
-        update_cache();
-        malloc_trim(0);
-        for (int i = 0; i < 60 * 60 && !interrupted.load(); ++i) {
-          sleep(1);
-        }
-      }
-    });
-  }
-
-  void shutdown() {
-    interrupted.store(true);
-    if (t1.joinable()) {
-      t1.join();
-    }
+  void run() {
+    update_cache();
+    malloc_trim(0);
   }
 
   void update_cache();
