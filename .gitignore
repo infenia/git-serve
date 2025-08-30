@@ -106,4 +106,4 @@ fabric.properties
 
 .cache/
 
-build/
+build_cmake/

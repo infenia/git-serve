@@ -15,14 +15,9 @@
  */
 
 #pragma once
-#include <zlib.h>
 
-#include <atomic>
-#include <cstring>
-#include <iostream>
-#include <mutex>
+#include <fstream>
 #include <string>
-#include <unordered_map>
 
 struct PostalCode {
   std::string name;
@@ -51,89 +46,38 @@ struct Configuration {
   }
 };
 
-struct ResponseBuffer {
-  char* data;
-  int len;
-};
 
 struct MasterDataBuffer {
-  bool updated               = false;
-  std::atomic_bool spin_lock = false;
-  std::unordered_map<std::string, ResponseBuffer*> master_data;
-
-  std::string compressGzip(const std::string& data) {
-    z_stream zs;
-    memset(&zs, 0, sizeof(zs));
-
-    if (deflateInit2(&zs, Z_BEST_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8,
-                     Z_DEFAULT_STRATEGY) != Z_OK)
-      throw std::runtime_error("deflateInit2 failed");
-
-    zs.next_in  = (Bytef*)data.data();
-    zs.avail_in = data.size();
-
-    std::string outString;
-    const size_t bufferSize = 32768;
-    unsigned char tempBuffer[bufferSize];
-
-    int ret;
-    do {
-      zs.next_out  = tempBuffer;
-      zs.avail_out = bufferSize;
-
-      ret = deflate(&zs, Z_FINISH);
-      if (ret != Z_OK && ret != Z_STREAM_END && ret != Z_BUF_ERROR) break;
-
-      outString.append(reinterpret_cast<char*>(tempBuffer),
-                       bufferSize - zs.avail_out);
-    } while (ret != Z_STREAM_END);
-
-    deflateEnd(&zs);
-
-    if (ret != Z_STREAM_END) throw std::runtime_error("deflate failed");
-
-    return outString;
-  }
-
-  ResponseBuffer* get_item(const std::string& item) {
-    if (master_data.contains(item)) {
-      return master_data[item];
-    }
-    return nullptr;
-  }
-  void update(const std::string& item, char* raw_value) {
-    auto compressed_value = compressGzip(raw_value);
-
-    char* value = new char[compressed_value.size() + 1];
-    memset(value, 0, compressed_value.size() + 1);
-    std::copy(compressed_value.begin(), compressed_value.end(), value);
-    if (master_data.contains(item)) {
-      auto temp = master_data[item]->data;
-
-      master_data[item]->data = value;
-      master_data[item]->len  = compressed_value.length();
-
-      delete temp;
-    } else {
-      ResponseBuffer* buffer = new ResponseBuffer;
-      buffer->data           = value;
-      buffer->len            = compressed_value.length();
-      master_data[item]      = buffer;
-    }
-  }
-
   void update(const std::string& item, const std::string& value) {
-    char* data = (char*)malloc(value.length() + 1);
-    memset(data, 0, value.length() + 1);
-    strncpy(data, value.c_str(), value.length());
-    update(item, data);
-    free(data);
-  }
+    std::string file_path = "/var/www/html" + item + ".json";
 
-  ~MasterDataBuffer() {
-    for (auto& [key, buffer] : master_data) {
-      delete[] buffer->data;
-      delete buffer;
+    // Check if file exists and has the same content
+    std::ifstream existing_file(file_path);
+    if (existing_file.is_open()) {
+      std::string existing_content((std::istreambuf_iterator<char>(existing_file)),
+                                   std::istreambuf_iterator<char>());
+      existing_file.close();
+      
+      // If content is identical, don't write (preserves modification time)
+      if (existing_content == value) {
+        return;
+      }
+    }
+
+    // Create directory structure if needed
+    size_t last_slash = file_path.find_last_of('/');
+    if (last_slash != std::string::npos) {
+      std::string dir_path  = file_path.substr(0, last_slash);
+      std::string mkdir_cmd = "mkdir -p " + dir_path;
+      system(mkdir_cmd.c_str());
+    }
+
+    // Write data directly to file only if content changed
+    std::ofstream file(file_path, std::ios::out);
+    if (file.is_open()) {
+      file << value;
+      file.close();
     }
   }
+
 };

@@ -15,37 +15,48 @@
  */
 
 #include <atomic>
-#include <cstdlib>
+#include <chrono>
+#include <csignal>
+#include <thread>
 
 #include "easymarry/easymarry.hpp"
 #include "easymarry/master_data.hpp"
-#include "rest/connection.hpp"
-#include "rest/io_handler.hpp"
-#include "rest/server_context.hpp"
 #include "utils/logger.hpp"
 
+// Global interrupt flag for signal handling
+std::atomic_bool g_interrupted(false);
+
+// Signal handler for SIGINT and SIGTERM
+void signal_handler(int signal) {
+  if (signal == SIGINT || signal == SIGTERM) {
+    logger::get()->info("Received interrupt signal, shutting down gracefully");
+    g_interrupted.store(true);
+  }
+}
+
 int main(int argc, const char **argv) {
-  std::atomic_bool interrupted(false);
+  logger::init();
+  logger::get()->info("Application starting");
+
+  // Set up signal handlers for graceful shutdown
+  std::signal(SIGINT, signal_handler);
+  std::signal(SIGTERM, signal_handler);
+
   Configuration conf;
   conf.populate_config();
 
-  logger::init();
-  logger::get()->info("Env loaded");
   MasterDataBuffer data_buffer;
 
-  EasyMarry em(conf, &data_buffer, interrupted);
+  EasyMarry em(conf, &data_buffer, g_interrupted);
   em.start_timer_job();
 
-  IOHandler io_handler;
-  Router router(&em, &io_handler);
-  ServerContext cxt;
+  // Wait for interrupt signal
+  while (!g_interrupted.load()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
 
-  cxt.port       = 8080;
-  cxt.router     = &router;
-  cxt.io_handler = &io_handler;
-
-  Connection connection(&cxt, interrupted);
-  connection.listen();
-
+  logger::get()->info("Application shutting down");
+  em.shutdown();
+  logger::get()->info("Application shutdown complete");
   return 0;
 }

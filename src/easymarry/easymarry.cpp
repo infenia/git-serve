@@ -15,8 +15,9 @@
  */
 
 // Module: easymarry/easymarry.cpp
-// Implements business logic for application-specific workflows and external API calls (e.g., GitHub).
-// Error Handling: Uses retry logic and logs failures for all external calls.
+// Implements business logic for application-specific workflows and external API
+// calls (e.g., GitHub). Error Handling: Uses retry logic and logs failures for
+// all external calls.
 
 #include "easymarry.hpp"
 
@@ -36,16 +37,14 @@
 #include <cstring>
 #include <forward_list>
 #include <list>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 
 #include "easymarry/master_data.hpp"
-#include "rest/http_transaction.hpp"
-#include "rest/io_handler.hpp"
 #include "utils/logger.hpp"
 #include "utils/trace_id.hpp"
-#include <nlohmann/json.hpp>
 
 off_t get_file_size(int fd) {
   struct stat st;
@@ -96,14 +95,6 @@ std::string postalcodes_to_json(std::list<PostalCode>& postalCodes) {
   return json;
 }
 
-void update_item_cache(const std::string& buff, const std::string& loc,
-                       MasterDataBuffer* data_buffer) {
-  char* data = new char[buff.length() + 1];
-  memset(data, 0, buff.length() + 1);
-  strncpy(data, buff.c_str(), buff.length());
-
-  data_buffer->update(loc, data);
-}
 
 void update_postalcodes_cache(const char* buff, MasterDataBuffer* data_buffer) {
   std::string csv(buff);
@@ -161,11 +152,12 @@ struct ResponseData {
 size_t write_callback(void* ptr, size_t size, size_t nmemb, void* userdata) {
   size_t total_size        = size * nmemb;
   struct ResponseData* res = (struct ResponseData*)userdata;
-  std::string trace_id = traceid::generate();
+  std::string trace_id     = traceid::generate();
 
   char* temp = (char*)realloc(res->data, res->size + total_size + 1);
   if (temp == NULL) {
-    logger::get()->error("Memory allocation failed", nlohmann::json{{"trace_id", trace_id}}.dump());
+    logger::get()->error("Memory allocation failed",
+                         nlohmann::json{{"trace_id", trace_id}}.dump());
     return 0;
   }
 
@@ -180,15 +172,15 @@ size_t write_callback(void* ptr, size_t size, size_t nmemb, void* userdata) {
 char* get_files_from_github(const std::string& token, const std::string& owner,
                             const std::string& repo, const std::string& branch,
                             const std::string& path) {
-  std::string url =
-      "https://api.github.com/repos/" + owner + "/" + repo + "/contents/" + path  + "?ref=" + branch;
+  std::string url = "https://api.github.com/repos/" + owner + "/" + repo +
+                    "/contents/" + path + "?ref=" + branch;
   std::string auth_header = "Authorization: Bearer " + token;
   CURL* curl;
   CURLcode res;
   ResponseData data;
   std::string trace_id = traceid::generate();
-  data.data = (char*)malloc(1);  // Allocate initial memory
-  data.size = 0;
+  data.data            = (char*)malloc(1);  // Allocate initial memory
+  data.size            = 0;
 
   curl = curl_easy_init();
   if (curl) {
@@ -197,7 +189,7 @@ char* get_files_from_github(const std::string& token, const std::string& owner,
         curl_slist_append(headers, "Accept: application/vnd.github.raw+json");
     headers = curl_slist_append(headers, auth_header.c_str());
     headers = curl_slist_append(headers, "X-GitHub-Api-Version: 2022-11-28");
-   
+
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
@@ -206,40 +198,35 @@ char* get_files_from_github(const std::string& token, const std::string& owner,
     curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
     curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 20 * 1024 * 1024);
 
-    int max_retries = 3;
+    int max_retries     = 3;
     int retry_delay_sec = 2;
-    int attempt = 0;
-    bool success = false;
+    int attempt         = 0;
+    bool success        = false;
     for (attempt = 0; attempt < max_retries; ++attempt) {
       // Log each attempt to call GitHub
-      nlohmann::json call_log = {
-        {"msg", "GitHub API call"},
-        {"url", url},
-        {"trace_id", trace_id},
-        {"attempt", attempt + 1}
-      };
+      nlohmann::json call_log = {{"msg", "GitHub API call"},
+                                 {"url", url},
+                                 {"trace_id", trace_id},
+                                 {"attempt", attempt + 1}};
       logger::get()->info(call_log.dump());
       res = curl_easy_perform(curl);
       if (res == CURLE_OK) {
         // Log GitHub call success
-        nlohmann::json success_log = {
-          {"msg", "GitHub API call success"},
-          {"url", url},
-          {"trace_id", trace_id},
-          {"attempt", attempt + 1}
-        };
+        nlohmann::json success_log = {{"msg", "GitHub API call success"},
+                                      {"url", url},
+                                      {"trace_id", trace_id},
+                                      {"attempt", attempt + 1}};
         logger::get()->info(success_log.dump());
         success = true;
         break;
       } else {
         const char* err_str = curl_easy_strerror(res);
-        std::string error_msg = std::string("curl_easy_perform() failed: ") + err_str;
-        nlohmann::json log_obj = {
-          {"msg", error_msg},
-          {"trace_id", trace_id},
-          {"url", url},
-          {"attempt", attempt + 1}
-        };
+        std::string error_msg =
+            std::string("curl_easy_perform() failed: ") + err_str;
+        nlohmann::json log_obj = {{"msg", error_msg},
+                                  {"trace_id", trace_id},
+                                  {"url", url},
+                                  {"attempt", attempt + 1}};
         logger::get()->error(log_obj.dump());
         sleep(retry_delay_sec);
       }
@@ -253,20 +240,107 @@ char* get_files_from_github(const std::string& token, const std::string& owner,
       return nullptr;
     }
   }
+  
+  // Clean up if curl_easy_init failed
+  free(data.data);
   return nullptr;
 }
 
-int serve_item(const std::string loc, HttpTransaction* transaction,
-               IOHandler* io_handler, MasterDataBuffer* data_buffer) {
-  auto data = data_buffer->get_item(loc);
-  if (data != nullptr) {
-    transaction->set_response(http_status::HTTP_STATUS_OK, data->data,
-                              data->len);
-    io_handler->write_response(transaction);
-    return 0;
-  } else {
-    transaction->set_response(http_status::HTTP_STATUS_NOT_FOUND, nullptr, 0);
-    io_handler->write_response(transaction);
-    return 0;
+void EasyMarry::update_cache() {
+  std::string token  = conf.token;
+  std::string repo   = conf.repo;
+  std::string owner  = conf.owner;
+  std::string branch = conf.branch;
+
+  if (auto health = get_files_from_github(token, owner, repo, branch,
+                                          "health/status.json");
+      health) {
+    data_buffer->update("/health", std::string(health));
+    free(health);
+  }
+
+  if (auto age = get_files_from_github(token, owner, repo, branch,
+                                       "resource/age.json");
+      age) {
+    data_buffer->update("/age", std::string(age));
+    free(age);
+  }
+
+  if (auto caste = get_files_from_github(token, owner, repo, branch,
+                                         "resource/caste.json");
+      caste) {
+    data_buffer->update("/caste", std::string(caste));
+    free(caste);
+  }
+
+  if (auto country = get_files_from_github(token, owner, repo, branch,
+                                           "resource/country.json");
+      country) {
+    data_buffer->update("/country", std::string(country));
+    free(country);
+  }
+
+  if (auto designation = get_files_from_github(token, owner, repo, branch,
+                                               "resource/designation.json");
+      designation) {
+    data_buffer->update("/designation", std::string(designation));
+    free(designation);
+  }
+
+  if (auto im_signing_up_for = get_files_from_github(
+          token, owner, repo, branch, "resource/im-signing-up-for.json");
+      im_signing_up_for) {
+    data_buffer->update("/im-signing-up-for", std::string(im_signing_up_for));
+    free(im_signing_up_for);
+  }
+
+  if (auto indian_state_district = get_files_from_github(
+          token, owner, repo, branch, "resource/indian-state-district.json");
+      indian_state_district) {
+    data_buffer->update("/indian-state-district",
+                        std::string(indian_state_district));
+    free(indian_state_district);
+  }
+
+  if (auto indian_state = get_files_from_github(token, owner, repo, branch,
+                                                "resource/indian-state.json");
+      indian_state) {
+    data_buffer->update("/indian-state", std::string(indian_state));
+    free(indian_state);
+  }
+
+  if (auto location = get_files_from_github(token, owner, repo, branch,
+                                            "resource/location.json");
+      location) {
+    data_buffer->update("/location", std::string(location));
+    free(location);
+  }
+
+  if (auto qualification = get_files_from_github(token, owner, repo, branch,
+                                                 "resource/qualification.json");
+      qualification) {
+    data_buffer->update("/qualification", std::string(qualification));
+    free(qualification);
+  }
+
+  if (auto religion = get_files_from_github(token, owner, repo, branch,
+                                            "resource/religion.json");
+      religion) {
+    data_buffer->update("/religion", std::string(religion));
+    free(religion);
+  }
+
+  if (auto sub_caste = get_files_from_github(token, owner, repo, branch,
+                                             "resource/sub-caste.json");
+      sub_caste) {
+    data_buffer->update("/sub-caste", std::string(sub_caste));
+    free(sub_caste);
+  }
+
+  if (auto buff = get_files_from_github(token, owner, repo, branch,
+                                        "resource/post.csv");
+      buff) {
+    update_postalcodes_cache(buff, data_buffer);
+    free(buff);
   }
 }

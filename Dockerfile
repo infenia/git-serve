@@ -30,20 +30,38 @@ FROM debian:bookworm-slim AS runtime
 
 # Install only necessary runtime libraries
 RUN apt-get update && apt-get install -y \
-    libwebsockets17 libcurl4-gnutls-dev libspdlog-dev nlohmann-json3-dev \
+    libwebsockets17 libcurl4-gnutls-dev libspdlog-dev nlohmann-json3-dev nginx \
+    procps \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY default.conf /etc/nginx/conf.d/default.conf
+
+# Remove default nginx config
+RUN rm -f /etc/nginx/sites-enabled/default
+
+
 
 # Set working directory
 WORKDIR /easymarry-data
 
 # Copy only the compiled binary from the build stage
 COPY --from=builder /easymarry-data/build/em-data .
+COPY scripts/start.sh /scripts/start.sh
+
+RUN chmod +x /scripts/start.sh
 
 # Ensure the binary has execution permission
 RUN chmod +x em-data
 
+# Create web directory and set proper permissions
+RUN mkdir -p /var/www/html && \
+    chown -R www-data:www-data /var/www/html && \
+    chmod -R 755 /var/www/html
+
 # Expose default port
-EXPOSE 8080
+EXPOSE 80
 
 # Start the application
-CMD ["./em-data"]
+CMD ["/bin/bash","/scripts/start.sh"]
