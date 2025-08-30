@@ -19,8 +19,8 @@
 #include <csignal>
 #include <thread>
 
-#include "easymarry/easymarry.hpp"
-#include "easymarry/master_data.hpp"
+#include "git_serve/git_serve.hpp"
+#include "git_serve/master_data.hpp"
 #include "utils/logger.hpp"
 
 // Global interrupt flag for signal handling
@@ -45,9 +45,7 @@ int main(int argc, const char **argv) {
   Configuration conf;
   conf.populate_config();
 
-  MasterDataBuffer data_buffer;
-
-  EasyMarry em(conf, &data_buffer, g_interrupted);
+  GitServe em(conf, g_interrupted);
   em.start_timer_job();
 
   // Wait for interrupt signal

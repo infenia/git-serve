@@ -23,28 +23,26 @@
 #include <string>
 #include <thread>
 
-#include "easymarry/master_data.hpp"
+#include "git_serve/master_data.hpp"
 #include "malloc.h"
 
 char* get_files_from_github(const std::string& token, const std::string& owner,
                             const std::string& repo, const std::string& branch,
                             const std::string& path);
 
-void update_postalcodes_cache(const char* buff, MasterDataBuffer* data_buffer);
+class GitServe;
+void update_postalcodes_cache(const char* buff, GitServe* git_serve);
 
-class EasyMarry {
+class GitServe {
   Configuration conf;
   std::thread t1;
   std::atomic_bool& interrupted;
 
  public:
-  MasterDataBuffer* data_buffer = nullptr;
+  GitServe(Configuration& _conf, std::atomic_bool& _interrupted)
+      : conf(_conf), interrupted(_interrupted) {}
 
-  EasyMarry(Configuration& _conf, MasterDataBuffer* _data_buffer,
-            std::atomic_bool& _interrupted)
-      : conf(_conf), data_buffer(_data_buffer), interrupted(_interrupted) {}
-
-  ~EasyMarry() {
+  ~GitServe() {
     if (t1.joinable()) {
       t1.join();
     }
@@ -70,4 +68,5 @@ class EasyMarry {
   }
 
   void update_cache();
+  void update_data(const std::string& item, const std::string& value);
 };

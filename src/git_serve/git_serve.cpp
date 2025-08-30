@@ -19,7 +19,7 @@
 // calls (e.g., GitHub). Error Handling: Uses retry logic and logs failures for
 // all external calls.
 
-#include "easymarry.hpp"
+#include "git_serve.hpp"
 
 #include <curl/curl.h>
 #include <curl/easy.h>
@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <fstream>
 #include <forward_list>
 #include <list>
 #include <nlohmann/json.hpp>
@@ -42,7 +43,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "easymarry/master_data.hpp"
+#include "git_serve/master_data.hpp"
 #include "utils/logger.hpp"
 #include "utils/trace_id.hpp"
 
@@ -96,7 +97,7 @@ std::string postalcodes_to_json(std::list<PostalCode>& postalCodes) {
 }
 
 
-void update_postalcodes_cache(const char* buff, MasterDataBuffer* data_buffer) {
+void update_postalcodes_cache(const char* buff, GitServe* git_serve) {
   std::string csv(buff);
   std::stringstream csv_stream(csv);
   std::string csv_line;
@@ -139,7 +140,7 @@ void update_postalcodes_cache(const char* buff, MasterDataBuffer* data_buffer) {
 
   for (auto& grouped_postalcodes : postalCodes_map) {
     auto json_array = postalcodes_to_json(grouped_postalcodes.second);
-    data_buffer->update("/postalcode/" + grouped_postalcodes.first, json_array);
+    git_serve->update_data("/postalcode/" + grouped_postalcodes.first, json_array);
   }
 }
 
@@ -246,7 +247,7 @@ char* get_files_from_github(const std::string& token, const std::string& owner,
   return nullptr;
 }
 
-void EasyMarry::update_cache() {
+void GitServe::update_cache() {
   std::string token  = conf.token;
   std::string repo   = conf.repo;
   std::string owner  = conf.owner;
@@ -255,49 +256,49 @@ void EasyMarry::update_cache() {
   if (auto health = get_files_from_github(token, owner, repo, branch,
                                           "health/status.json");
       health) {
-    data_buffer->update("/health", std::string(health));
+    update_data("/health", std::string(health));
     free(health);
   }
 
   if (auto age = get_files_from_github(token, owner, repo, branch,
                                        "resource/age.json");
       age) {
-    data_buffer->update("/age", std::string(age));
+    update_data("/age", std::string(age));
     free(age);
   }
 
   if (auto caste = get_files_from_github(token, owner, repo, branch,
                                          "resource/caste.json");
       caste) {
-    data_buffer->update("/caste", std::string(caste));
+    update_data("/caste", std::string(caste));
     free(caste);
   }
 
   if (auto country = get_files_from_github(token, owner, repo, branch,
                                            "resource/country.json");
       country) {
-    data_buffer->update("/country", std::string(country));
+    update_data("/country", std::string(country));
     free(country);
   }
 
   if (auto designation = get_files_from_github(token, owner, repo, branch,
                                                "resource/designation.json");
       designation) {
-    data_buffer->update("/designation", std::string(designation));
+    update_data("/designation", std::string(designation));
     free(designation);
   }
 
   if (auto im_signing_up_for = get_files_from_github(
           token, owner, repo, branch, "resource/im-signing-up-for.json");
       im_signing_up_for) {
-    data_buffer->update("/im-signing-up-for", std::string(im_signing_up_for));
+    update_data("/im-signing-up-for", std::string(im_signing_up_for));
     free(im_signing_up_for);
   }
 
   if (auto indian_state_district = get_files_from_github(
           token, owner, repo, branch, "resource/indian-state-district.json");
       indian_state_district) {
-    data_buffer->update("/indian-state-district",
+    update_data("/indian-state-district",
                         std::string(indian_state_district));
     free(indian_state_district);
   }
@@ -305,42 +306,74 @@ void EasyMarry::update_cache() {
   if (auto indian_state = get_files_from_github(token, owner, repo, branch,
                                                 "resource/indian-state.json");
       indian_state) {
-    data_buffer->update("/indian-state", std::string(indian_state));
+    update_data("/indian-state", std::string(indian_state));
     free(indian_state);
   }
 
   if (auto location = get_files_from_github(token, owner, repo, branch,
                                             "resource/location.json");
       location) {
-    data_buffer->update("/location", std::string(location));
+    update_data("/location", std::string(location));
     free(location);
   }
 
   if (auto qualification = get_files_from_github(token, owner, repo, branch,
                                                  "resource/qualification.json");
       qualification) {
-    data_buffer->update("/qualification", std::string(qualification));
+    update_data("/qualification", std::string(qualification));
     free(qualification);
   }
 
   if (auto religion = get_files_from_github(token, owner, repo, branch,
                                             "resource/religion.json");
       religion) {
-    data_buffer->update("/religion", std::string(religion));
+    update_data("/religion", std::string(religion));
     free(religion);
   }
 
   if (auto sub_caste = get_files_from_github(token, owner, repo, branch,
                                              "resource/sub-caste.json");
       sub_caste) {
-    data_buffer->update("/sub-caste", std::string(sub_caste));
+    update_data("/sub-caste", std::string(sub_caste));
     free(sub_caste);
   }
 
   if (auto buff = get_files_from_github(token, owner, repo, branch,
                                         "resource/post.csv");
       buff) {
-    update_postalcodes_cache(buff, data_buffer);
+    update_postalcodes_cache(buff, this);
     free(buff);
+  }
+}
+
+void GitServe::update_data(const std::string& item, const std::string& value) {
+  std::string file_path = "/var/www/html" + item + ".json";
+
+  // Check if file exists and has the same content
+  std::ifstream existing_file(file_path);
+  if (existing_file.is_open()) {
+    std::string existing_content((std::istreambuf_iterator<char>(existing_file)),
+                                 std::istreambuf_iterator<char>());
+    existing_file.close();
+    
+    // If content is identical, don't write (preserves modification time)
+    if (existing_content == value) {
+      return;
+    }
+  }
+
+  // Create directory structure if needed
+  size_t last_slash = file_path.find_last_of('/');
+  if (last_slash != std::string::npos) {
+    std::string dir_path  = file_path.substr(0, last_slash);
+    std::string mkdir_cmd = "mkdir -p " + dir_path;
+    system(mkdir_cmd.c_str());
+  }
+
+  // Write data directly to file only if content changed
+  std::ofstream file(file_path, std::ios::out);
+  if (file.is_open()) {
+    file << value;
+    file.close();
   }
 }

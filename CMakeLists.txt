@@ -18,7 +18,7 @@ find_package(nlohmann_json 3.2.0 REQUIRED)
 
 # Define build for JunkYard
 set(EM_MASTERDATA_SOURCE
-    src/easymarry/easymarry.cpp
+    src/git_serve/git_serve.cpp
     src/main.cpp
     src/utils/logger.cpp
     src/utils/trace_id.cpp
