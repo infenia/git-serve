@@ -258,85 +258,85 @@ void GitServe::update_cache() {
     free(health);
   }
 
-  if (auto age = get_files_from_github(token, owner, repo, branch,
-                                       "resource/age.json");
+  if (auto age =
+          get_files_from_github(token, owner, repo, branch, "data/age.json");
       age) {
     update_data("/age", std::string(age));
     free(age);
   }
 
-  if (auto caste = get_files_from_github(token, owner, repo, branch,
-                                         "resource/caste.json");
+  if (auto caste =
+          get_files_from_github(token, owner, repo, branch, "data/caste.json");
       caste) {
     update_data("/caste", std::string(caste));
     free(caste);
   }
 
   if (auto country = get_files_from_github(token, owner, repo, branch,
-                                           "resource/country.json");
+                                           "data/country.json");
       country) {
     update_data("/country", std::string(country));
     free(country);
   }
 
   if (auto designation = get_files_from_github(token, owner, repo, branch,
-                                               "resource/designation.json");
+                                               "data/designation.json");
       designation) {
     update_data("/designation", std::string(designation));
     free(designation);
   }
 
   if (auto im_signing_up_for = get_files_from_github(
-          token, owner, repo, branch, "resource/im-signing-up-for.json");
+          token, owner, repo, branch, "data/im-signing-up-for.json");
       im_signing_up_for) {
     update_data("/im-signing-up-for", std::string(im_signing_up_for));
     free(im_signing_up_for);
   }
 
   if (auto indian_state_district = get_files_from_github(
-          token, owner, repo, branch, "resource/indian-state-district.json");
+          token, owner, repo, branch, "data/indian-state-district.json");
       indian_state_district) {
     update_data("/indian-state-district", std::string(indian_state_district));
     free(indian_state_district);
   }
 
   if (auto indian_state = get_files_from_github(token, owner, repo, branch,
-                                                "resource/indian-state.json");
+                                                "data/indian-state.json");
       indian_state) {
     update_data("/indian-state", std::string(indian_state));
     free(indian_state);
   }
 
   if (auto location = get_files_from_github(token, owner, repo, branch,
-                                            "resource/location.json");
+                                            "data/location.json");
       location) {
     update_data("/location", std::string(location));
     free(location);
   }
 
   if (auto qualification = get_files_from_github(token, owner, repo, branch,
-                                                 "resource/qualification.json");
+                                                 "data/qualification.json");
       qualification) {
     update_data("/qualification", std::string(qualification));
     free(qualification);
   }
 
   if (auto religion = get_files_from_github(token, owner, repo, branch,
-                                            "resource/religion.json");
+                                            "data/religion.json");
       religion) {
     update_data("/religion", std::string(religion));
     free(religion);
   }
 
   if (auto sub_caste = get_files_from_github(token, owner, repo, branch,
-                                             "resource/sub-caste.json");
+                                             "data/sub-caste.json");
       sub_caste) {
     update_data("/sub-caste", std::string(sub_caste));
     free(sub_caste);
   }
 
-  if (auto buff = get_files_from_github(token, owner, repo, branch,
-                                        "resource/post.csv");
+  if (auto buff =
+          get_files_from_github(token, owner, repo, branch, "data/post.csv");
       buff) {
     update_postalcodes_cache(buff, this);
     free(buff);
